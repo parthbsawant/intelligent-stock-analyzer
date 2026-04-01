@@ -2,6 +2,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Query
 from typing import List
 import pandas as pd
+from services.dl.sentiment_embedding import get_embeddings
+from services.dl.prediction_dl import dl_predict
+from services.dl.lstm_model import lstm_predict
+
+from services.dl.fusion import final_decision
+
 
 # ----------------------------------------
 # 🔷 ALL SERVICE IMPORTS AT TOP
@@ -128,13 +134,28 @@ def analyze_stock(symbol: str = Query(...)):
         query = get_query(symbol)
 
         stock_data = fetch_stock_data(ticker)
+        lstm_result = lstm_predict(stock_data)
 
         if not stock_data:
             return {"status": "error", "message": "Stock data unavailable"}
 
         news = fetch_news(query)[:2]
+        # 🔥 DL EMBEDDINGS (SAFE LIMIT)
+        texts = [article["title"] for article in news[:2]]
 
+        try:
+            embeddings = get_embeddings(texts)
+            embedding_shape = embeddings.shape if len(embeddings) > 0 else (0,)
+        except Exception as e:
+            print("[EMBEDDING ERROR]", e)
+            embeddings = []
+            embedding_shape = (0,)
+        
+        prediction = dl_predict(embeddings)
         sentiment_result = get_overall_sentiment(news[:2])
+
+
+        final_signal = final_decision(prediction, lstm_result)
 
         return {
             "status": "success",
@@ -144,6 +165,14 @@ def analyze_stock(symbol: str = Query(...)):
                 "stock": stock_data,
                 "news": news,
                 "sentiment": sentiment_result
+            },
+            "dl_features": {
+                "embedding_shape": embedding_shape
+            },
+            "dl_prediction": prediction,
+            "lstm_prediction": lstm_result,
+            "final_prediction": {
+            "signal": final_signal
             }
         }
 
