@@ -7,7 +7,7 @@ import ErrorState from '../components/ErrorState'
 import Loader from '../components/Loader'
 import SectionContainer from '../components/SectionContainer'
 import { Skeleton } from '../components/Skeleton'
-import { analyzeStock } from '../services/stockAnalysisService'
+import { analyzeStock, getEvents, getTechnicals } from "../services/stockAnalysisService";
 
 const LOW_CONFIDENCE_THRESHOLD = 60
 
@@ -28,19 +28,71 @@ function toDisplayItem(value, fallbackLabel = 'HOLD') {
 
 function normalizeNewsItem(item, index) {
   if (typeof item === 'string') return { id: `${item}-${index}`, title: item, sentiment: 'HOLD' }
+  // return {
+  //   id: item?.id ?? `${item?.title ?? 'news'}-${index}`,
+  //   title: item?.title ?? 'Untitled update',
+  //   sentiment: normalizeLabel(item?.sentiment ?? item?.signal),
+  // }
   return {
-    id: item?.id ?? `${item?.title ?? 'news'}-${index}`,
-    title: item?.title ?? 'Untitled update',
-    sentiment: normalizeLabel(item?.sentiment ?? item?.signal),
+  id: item?.id ?? `${item?.title ?? 'news'}-${index}`,
+  title: item?.title ?? 'Untitled update',
+  sentiment: normalizeLabel(item?.sentiment),
   }
 }
 
+// function normalizeEventItem(item, index) {
+//   if (typeof item === 'string') return { id: `${item}-${index}`, name: item, detail: 'No additional details provided.' }
+//   return {
+//     id: item?.id ?? `${item?.name ?? 'event'}-${index}`,
+//     name: item?.name ?? 'Unnamed event',
+//     detail: item?.detail ?? item?.description ?? 'No additional details provided.',
+//   }
+// }
+
+// function normalizeEventItem(item, index) {
+//   if (typeof item === 'string') {
+//     return {
+//       id: `${item}-${index}`,
+//       name: item.toUpperCase(),
+//       detail: `Detected event: ${item}`,
+//     }
+//   }
+
+//   return {
+//     id: item?.id ?? `${item?.name ?? 'event'}-${index}`,
+//     name: item?.name ?? 'Unnamed event',
+//     detail: item?.detail ?? item?.description ?? 'No additional details provided.',
+//   }
+  
+// }
+
 function normalizeEventItem(item, index) {
-  if (typeof item === 'string') return { id: `${item}-${index}`, name: item, detail: 'No additional details provided.' }
+  if (typeof item === 'string') {
+    return {
+      id: `${item}-${index}`,
+      name: item.toUpperCase(),
+      sentiment: 'NEUTRAL',
+      score: 0,
+      source: null,
+    }
+  }
+
+  if (item?.name) {
+    return {
+      id: `${item.name}-${index}`,
+      name: item.name.toUpperCase(),
+      sentiment: (item.sentiment || 'neutral').toUpperCase(),
+      score: item.score || 0,
+      source: item.source || null,   // 🔥 article title for hover
+    }
+  }
+
   return {
-    id: item?.id ?? `${item?.name ?? 'event'}-${index}`,
-    name: item?.name ?? 'Unnamed event',
-    detail: item?.detail ?? item?.description ?? 'No additional details provided.',
+    id: `${item?.id ?? index}`,
+    name: (item?.name ?? 'Unnamed event').toUpperCase(),
+    sentiment: 'NEUTRAL',
+    score: 0,
+    source: null,
   }
 }
 
@@ -189,7 +241,12 @@ function StockAnalysisPage() {
       confidence,
       lowConfidence,
       mixedSignals,
-      technical: { rsi: technical.rsi ?? null, movingAverage: technical.movingAverage ?? null },
+      // technical: { rsi: technical.rsi ?? null, movingAverage: technical.movingAverage ?? null },
+      technical: {
+      rsi: technical.rsi ?? null,
+      movingAverage: technical.movingAverage ?? null,
+      ema: technical.ema ?? null,   // 🔥 add EMA
+      },
       news,
       events,
       explanation: analysis.explanation || 'No explanation available.',
@@ -200,22 +257,152 @@ function StockAnalysisPage() {
 
   const hasNoData = parsed && isEmptyAnalysis(parsed)
 
+  // const fetchStock = async (symbol) => {
+  //   if (!symbol) return
+  //   setIsLoading(true)
+  //   setError('')
+  //   setValidationError('')
+  //   try {
+
+  //     const response = await analyzeStock(symbol)
+  //     const eventsResponse = await getEvents(symbol)
+  //     const techResponse = await getTechnicals(symbol)   // 🔥 NEW
+
+  //     const backendData = response?.data || {}
+  //     const rawEvents = eventsResponse?.data || []
+  //     const techData = techResponse?.data || {} 
+
+  //     // // 🔥 Extract actual events
+  //     // let eventsData = []
+
+  //     // rawEvents.forEach(item => {
+  //     //   if (Array.isArray(item.events)) {
+  //     //     eventsData.push(...item.events)
+  //     //   }
+  //     // })
+  //     const newsDetails = backendData?.sentiment?.details || []
+
+  //     // let eventsData = []
+
+  //     // rawEvents.forEach(item => {
+  //     //   if (Array.isArray(item.events)) {
+  //     //     item.events.forEach(event => {
+            
+  //     //       // 🔥 Find matching news for this event
+  //     //       const matchedNews = newsDetails.find(news =>
+  //     //         news.title?.toLowerCase().includes(event)
+  //     //       )
+
+  //     //       eventsData.push({
+  //     //         name: event,
+  //     //         sentiment: matchedNews?.sentiment || "neutral",
+  //     //         score: matchedNews?.score || 0
+  //     //       })
+  //     //     })
+  //     //   }
+  //     // })
+
+  //     let eventsData = []
+
+  //     rawEvents.forEach(item => {
+  //       if (Array.isArray(item.events)) {
+  //         // 🔥 sentiment and score now come directly from the enriched backend response
+  //         const articleSentiment = item.sentiment || "neutral"
+  //         const articleScore = item.score || 0
+
+  //         item.events.forEach(event => {
+  //           eventsData.push({
+  //             name: event,
+  //             sentiment: articleSentiment,
+  //             score: articleScore,
+  //             source: item.title || null   // 🔥 carry article title for hover tooltip
+  //           })
+  //         })
+  //       }
+  //     })
+
+  //     // 🔥 Remove duplicates (by event name)
+  //     const uniqueMap = new Map()
+  //     eventsData.forEach(e => {
+  //       if (!uniqueMap.has(e.name)) {
+  //         uniqueMap.set(e.name, e)
+  //       }
+  //     })
+
+  //     eventsData = Array.from(uniqueMap.values())
+
+  //     // // 🔥 Remove duplicates
+  //     // eventsData = [...new Set(eventsData)]
+
+  //    setAnalysis({
+  //   company: symbol,
+  //   sentiment: backendData?.sentiment?.overall_sentiment || "HOLD",
+  //   news: backendData?.sentiment?.details || [],
+  //   events: eventsData,
+  //   prediction: "HOLD",
+  //   risk: "MEDIUM",
+  //   signal: backendData?.sentiment?.overall_sentiment || "HOLD",
+  //   confidence: 70,
+  //   technical: {
+  //     rsi: techData?.RSI ?? null,              // 🔥 real RSI
+  //     movingAverage: techData?.SMA ?? null,    // 🔥 real SMA
+  //     ema: techData?.EMA ?? null,              // 🔥 real EMA
+  //   },
+  // })
   const fetchStock = async (symbol) => {
-    if (!symbol) return
-    setIsLoading(true)
-    setError('')
-    setValidationError('')
+  if (!symbol) return
+  setIsLoading(true)
+  setError('')
+  setValidationError('')
+
+  try {
+    // These two are critical — if they fail, show error
+    const [response, eventsResponse] = await Promise.all([
+      analyzeStock(symbol),
+      getEvents(symbol),
+    ])
+
+    const backendData = response?.data?.data || {}
+    const rawEvents = eventsResponse?.data?.data || []
+
+    // Technical is non-critical — fetch separately, don't crash if it fails
+    let techData = {}
     try {
-      const data = await analyzeStock(symbol)
-      setAnalysis(data ?? null)
-      setRequestedSymbol(symbol)
-    } catch (apiError) {
-      setError(apiError?.response?.data?.message || 'Unable to fetch stock analysis. Please try again.')
-      setAnalysis(null)
-    } finally {
-      setIsLoading(false)
+      const techResponse = await getTechnicals(symbol)
+      techData = techResponse?.data || {}
+    } catch (techErr) {
+      console.warn("Technical fetch failed:", techErr)
+      // techData stays empty — UI shows "unavailable"
     }
+
+    // ... rest of your eventsData building logic unchanged ...
+
+    setAnalysis({
+      company: symbol,
+      sentiment: backendData?.sentiment?.overall_sentiment || "HOLD",
+      news: backendData?.sentiment?.details || [],
+      events: eventsData,
+      prediction: "HOLD",
+      risk: "MEDIUM",
+      signal: backendData?.sentiment?.overall_sentiment || "HOLD",
+      confidence: 70,
+      technical: {
+        rsi: techData?.RSI ?? null,
+        movingAverage: techData?.SMA ?? null,
+        ema: techData?.EMA ?? null,
+        rsiSignal: techData?.RSI_signal ?? null,   // 🔥 new field from backend
+      },
+    })
+
+    setRequestedSymbol(symbol)
+  } catch (apiError) {
+    console.error("API Error:", apiError)
+    setError(apiError?.response?.data?.message || 'Unable to fetch stock analysis. Please try again.')
+    setAnalysis(null)
+  } finally {
+    setIsLoading(false)
   }
+}
 
   const handleSearchSubmit = async (event) => {
     event.preventDefault()
@@ -378,7 +565,7 @@ function StockAnalysisPage() {
               </SectionContainer>
             )}
 
-            <SectionContainer
+            {/* <SectionContainer
               title="Event Extraction"
               subtitle="Detected market-moving events"
               className={parsed.news.length > 0 ? 'lg:col-span-3' : 'lg:col-span-5'}
@@ -395,48 +582,124 @@ function StockAnalysisPage() {
               ) : (
                 <p className="text-sm text-slate-500">No events extracted for this symbol.</p>
               )}
-            </SectionContainer>
+            </SectionContainer> */}
 
             <SectionContainer
-              title="Technical Indicators"
-              subtitle="Quick snapshot"
-              className={parsed.news.length > 0 ? 'lg:col-span-4' : 'lg:col-span-7'}
-            >
-              {parsed.technical.rsi !== null || parsed.technical.movingAverage !== null ? (
-                <div className="grid grid-cols-1 gap-3">
-                  <div className="rounded-md bg-slate-50 p-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-slate-600">RSI</p>
-                      <p className="text-sm font-semibold text-[var(--color-primary)]">{parsed.technical.rsi ?? '--'}</p>
+                title="Event Extraction"
+                subtitle="Detected market-moving events"
+                className={parsed.news.length > 0 ? 'lg:col-span-3' : 'lg:col-span-5'}
+              >
+                {parsed.events.length > 0 ? (
+                  <ul className="space-y-3">
+                    {parsed.events.map((event) => (
+                      <li
+                        key={event.id}
+                        title={event.source ? `From: ${event.source}` : undefined}
+                        className="rounded-md bg-slate-50 p-3 cursor-default hover:bg-slate-100 transition-colors"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-[var(--color-primary)]">
+                            {event.name}
+                          </p>
+                          <Badge label={event.sentiment} />
+                        </div>
+                        <div className="mt-1 flex items-center gap-2">
+                          <div className="h-1.5 flex-1 rounded-full bg-slate-200">
+                            <div
+                              className="h-1.5 rounded-full bg-[var(--color-secondary)]"
+                              style={{ width: `${Math.min(100, Math.round((event.score || 0) * 100))}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-slate-500 whitespace-nowrap">
+                            {Math.round((event.score || 0) * 100)}%
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-slate-500">No events extracted for this symbol.</p>
+                )}
+              </SectionContainer>
+
+            <SectionContainer
+                title="Technical Indicators"
+                subtitle="Quick snapshot"
+                className={parsed.news.length > 0 ? 'lg:col-span-4' : 'lg:col-span-7'}
+              >
+                {parsed.technical.rsi !== null || parsed.technical.movingAverage !== null ? (
+                  <div className="grid grid-cols-1 gap-3">
+
+                    {/* RSI */}
+                    <div className="rounded-md bg-slate-50 p-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-slate-600">RSI</p>
+                        <p className={`text-sm font-semibold ${
+                          parsed.technical.rsi > 70
+                            ? 'text-red-500'
+                            : parsed.technical.rsi < 30
+                            ? 'text-green-600'
+                            : 'text-[var(--color-primary)]'
+                        }`}>
+                          {parsed.technical.rsi ?? '--'}
+                        </p>
+                      </div>
+                      {parsed.technical.rsi !== null && (
+                        <>
+                          <div className="mt-2 h-2 w-full rounded-full bg-slate-200">
+                            <div
+                              className={`h-2 rounded-full ${
+                                parsed.technical.rsi > 70
+                                  ? 'bg-red-400'
+                                  : parsed.technical.rsi < 30
+                                  ? 'bg-green-500'
+                                  : 'bg-[var(--color-secondary)]'
+                              }`}
+                              style={{ width: `${Math.min(100, Math.max(0, Number(parsed.technical.rsi)))}%` }}
+                            />
+                          </div>
+                          <p className="mt-1 text-xs text-slate-400">
+                            {parsed.technical.rsi > 70
+                              ? '⚠ Overbought'
+                              : parsed.technical.rsi < 30
+                              ? '✅ Oversold'
+                              : 'Neutral zone'}
+                          </p>
+                        </>
+                      )}
                     </div>
-                    {parsed.technical.rsi !== null && (
-                      <div className="mt-2 h-2 w-full rounded-full bg-slate-200">
-                        <div
-                          className="h-2 rounded-full bg-[var(--color-secondary)]"
-                          style={{ width: `${Math.min(100, Math.max(0, Number(parsed.technical.rsi)))}%` }}
-                        />
+
+                    {/* SMA */}
+                    <div className="rounded-md bg-slate-50 p-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-slate-600">SMA (5)</p>
+                        <p className="text-sm font-semibold text-[var(--color-primary)]">
+                          {parsed.technical.movingAverage ?? '--'}
+                        </p>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-400">Simple Moving Average — 5 period</p>
+                    </div>
+
+                    {/* EMA */}
+                    {parsed.technical.ema !== null && (
+                      <div className="rounded-md bg-slate-50 p-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-slate-600">EMA (5)</p>
+                          <p className="text-sm font-semibold text-[var(--color-primary)]">
+                            {parsed.technical.ema ?? '--'}
+                          </p>
+                        </div>
+                        <p className="mt-1 text-xs text-slate-400">Exponential Moving Average — 5 period</p>
                       </div>
                     )}
-                  </div>
 
-                  <div className="rounded-md bg-slate-50 p-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-slate-600">Moving Average</p>
-                      <p className="text-sm font-semibold text-[var(--color-primary)]">
-                        {parsed.technical.movingAverage?.value ?? parsed.technical.movingAverage ?? '--'}
-                      </p>
-                    </div>
-                    <p className="mt-2 text-xs text-slate-500">
-                      Period: {parsed.technical.movingAverage?.period ? parsed.technical.movingAverage.period : 'Not provided'}
-                    </p>
                   </div>
-                </div>
-              ) : (
-                <div className="rounded-md bg-slate-50 px-3 py-8 text-center text-sm text-slate-500">
-                  Technical data unavailable for this request.
-                </div>
-              )}
-            </SectionContainer>
+                ) : (
+                  <div className="rounded-md bg-slate-50 px-3 py-8 text-center text-sm text-slate-500">
+                    Technical data unavailable for this request.
+                  </div>
+                )}
+              </SectionContainer>
           </div>
 
           <SectionContainer title="Explanation Panel" subtitle="Why the model produced this prediction">
