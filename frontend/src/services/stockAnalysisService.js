@@ -11,7 +11,7 @@ export const analyzeStock = async (symbol) => {
     return response.data;
   } catch (error) {
     console.error("Analyze API Error:", error);
-    return null;
+    throw error;
   }
 };
 
@@ -24,14 +24,19 @@ export const getEvents = async (symbol) => {
     return response.data;
   } catch (error) {
     console.error("Events API Error:", error);
-    return null;
+    throw error;
   }
 };
 
 
 export const getTechnicals = async (symbol) => {
-  const response = await axios.get(`${API_BASE_URL}/technical-analysis`, {
-    params: { symbol }
-  })
-  return response
-}
+  try {
+    const response = await axios.get(`${API_BASE}/technical-analysis`, {
+      params: { symbol },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Technical API Error:", error);
+    throw error;
+  }
+};

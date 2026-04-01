@@ -28,43 +28,12 @@ function toDisplayItem(value, fallbackLabel = 'HOLD') {
 
 function normalizeNewsItem(item, index) {
   if (typeof item === 'string') return { id: `${item}-${index}`, title: item, sentiment: 'HOLD' }
-  // return {
-  //   id: item?.id ?? `${item?.title ?? 'news'}-${index}`,
-  //   title: item?.title ?? 'Untitled update',
-  //   sentiment: normalizeLabel(item?.sentiment ?? item?.signal),
-  // }
   return {
   id: item?.id ?? `${item?.title ?? 'news'}-${index}`,
   title: item?.title ?? 'Untitled update',
   sentiment: normalizeLabel(item?.sentiment),
   }
 }
-
-// function normalizeEventItem(item, index) {
-//   if (typeof item === 'string') return { id: `${item}-${index}`, name: item, detail: 'No additional details provided.' }
-//   return {
-//     id: item?.id ?? `${item?.name ?? 'event'}-${index}`,
-//     name: item?.name ?? 'Unnamed event',
-//     detail: item?.detail ?? item?.description ?? 'No additional details provided.',
-//   }
-// }
-
-// function normalizeEventItem(item, index) {
-//   if (typeof item === 'string') {
-//     return {
-//       id: `${item}-${index}`,
-//       name: item.toUpperCase(),
-//       detail: `Detected event: ${item}`,
-//     }
-//   }
-
-//   return {
-//     id: item?.id ?? `${item?.name ?? 'event'}-${index}`,
-//     name: item?.name ?? 'Unnamed event',
-//     detail: item?.detail ?? item?.description ?? 'No additional details provided.',
-//   }
-  
-// }
 
 function normalizeEventItem(item, index) {
   if (typeof item === 'string') {
@@ -257,151 +226,153 @@ function StockAnalysisPage() {
 
   const hasNoData = parsed && isEmptyAnalysis(parsed)
 
-  // const fetchStock = async (symbol) => {
-  //   if (!symbol) return
-  //   setIsLoading(true)
-  //   setError('')
-  //   setValidationError('')
-  //   try {
+//   const fetchStock = async (symbol) => {
+//   if (!symbol) return
+//   setIsLoading(true)
+//   setError('')
+//   setValidationError('')
 
-  //     const response = await analyzeStock(symbol)
-  //     const eventsResponse = await getEvents(symbol)
-  //     const techResponse = await getTechnicals(symbol)   // 🔥 NEW
+//   try {
+//     // These two are critical — if they fail, show error
+//     const [response, eventsResponse] = await Promise.all([
+//       analyzeStock(symbol),
+//       getEvents(symbol),
+//     ])
 
-  //     const backendData = response?.data || {}
-  //     const rawEvents = eventsResponse?.data || []
-  //     const techData = techResponse?.data || {} 
+//     const backendData = response?.data || {}
+//     const rawEvents = eventsResponse?.data || []
 
-  //     // // 🔥 Extract actual events
-  //     // let eventsData = []
+//     // Technical is non-critical — fetch separately, don't crash if it fails
+//     let techData = {}
+//     try {
+//       const techResponse = await getTechnicals(symbol)
+//       techData = techResponse || {}
+//     } catch (techErr) {
+//       console.warn("Technical fetch failed:", techErr)
+//       // techData stays empty — UI shows "unavailable"
+//     }
 
-  //     // rawEvents.forEach(item => {
-  //     //   if (Array.isArray(item.events)) {
-  //     //     eventsData.push(...item.events)
-  //     //   }
-  //     // })
-  //     const newsDetails = backendData?.sentiment?.details || []
+//     // ... rest of your eventsData building logic unchanged ...
 
-  //     // let eventsData = []
+//     let eventsData = []
 
-  //     // rawEvents.forEach(item => {
-  //     //   if (Array.isArray(item.events)) {
-  //     //     item.events.forEach(event => {
-            
-  //     //       // 🔥 Find matching news for this event
-  //     //       const matchedNews = newsDetails.find(news =>
-  //     //         news.title?.toLowerCase().includes(event)
-  //     //       )
+//     rawEvents.forEach(item => {
+//       if (Array.isArray(item.events)) {
+//         const articleSentiment = item.sentiment || "neutral"
+//         const articleScore = item.score || 0
 
-  //     //       eventsData.push({
-  //     //         name: event,
-  //     //         sentiment: matchedNews?.sentiment || "neutral",
-  //     //         score: matchedNews?.score || 0
-  //     //       })
-  //     //     })
-  //     //   }
-  //     // })
+//         item.events.forEach(event => {
+//           eventsData.push({
+//             name: event,
+//             sentiment: articleSentiment,
+//             score: articleScore,
+//             source: item.title || null
+//           })
+//         })
+//       }
+//     })
 
-  //     let eventsData = []
+//     setAnalysis({
+//       company: symbol,
+//       sentiment: backendData?.data?.sentiment?.overall_sentiment || "HOLD",
+//       news: backendData?.data?.sentiment?.details || [],
+//       events: eventsData,
+//       prediction: "HOLD",
+//       risk: "MEDIUM",
+//       signal: backendData?.sentiment?.overall_sentiment || "HOLD",
+//       confidence: 70,
+//       technical: {
+//         rsi: techData?.RSI ?? null,
+//         movingAverage: techData?.SMA ?? null,
+//         ema: techData?.EMA ?? null,
+//         rsiSignal: techData?.RSI_signal ?? null,   // 🔥 new field from backend
+//       },
+//     })
 
-  //     rawEvents.forEach(item => {
-  //       if (Array.isArray(item.events)) {
-  //         // 🔥 sentiment and score now come directly from the enriched backend response
-  //         const articleSentiment = item.sentiment || "neutral"
-  //         const articleScore = item.score || 0
+//     setRequestedSymbol(symbol)
+//   } catch (apiError) {
+//     console.error("API Error:", apiError)
+//     setError(apiError?.response?.data?.message || 'Unable to fetch stock analysis. Please try again.')
+//     setAnalysis(null)
+//   } finally {
+//     setIsLoading(false)
+//   }
+// }
 
-  //         item.events.forEach(event => {
-  //           eventsData.push({
-  //             name: event,
-  //             sentiment: articleSentiment,
-  //             score: articleScore,
-  //             source: item.title || null   // 🔥 carry article title for hover tooltip
-  //           })
-  //         })
-  //       }
-  //     })
-
-  //     // 🔥 Remove duplicates (by event name)
-  //     const uniqueMap = new Map()
-  //     eventsData.forEach(e => {
-  //       if (!uniqueMap.has(e.name)) {
-  //         uniqueMap.set(e.name, e)
-  //       }
-  //     })
-
-  //     eventsData = Array.from(uniqueMap.values())
-
-  //     // // 🔥 Remove duplicates
-  //     // eventsData = [...new Set(eventsData)]
-
-  //    setAnalysis({
-  //   company: symbol,
-  //   sentiment: backendData?.sentiment?.overall_sentiment || "HOLD",
-  //   news: backendData?.sentiment?.details || [],
-  //   events: eventsData,
-  //   prediction: "HOLD",
-  //   risk: "MEDIUM",
-  //   signal: backendData?.sentiment?.overall_sentiment || "HOLD",
-  //   confidence: 70,
-  //   technical: {
-  //     rsi: techData?.RSI ?? null,              // 🔥 real RSI
-  //     movingAverage: techData?.SMA ?? null,    // 🔥 real SMA
-  //     ema: techData?.EMA ?? null,              // 🔥 real EMA
-  //   },
-  // })
-  const fetchStock = async (symbol) => {
+const fetchStock = async (symbol) => {
   if (!symbol) return
   setIsLoading(true)
   setError('')
   setValidationError('')
 
   try {
-    // These two are critical — if they fail, show error
-    const [response, eventsResponse] = await Promise.all([
-      analyzeStock(symbol),
-      getEvents(symbol),
-    ])
+    // const [response, eventsResponse] = await Promise.all([
+    //   analyzeStock(symbol),
+    //   getEvents(symbol),
+    // ])
 
-    const backendData = response?.data?.data || {}
-    const rawEvents = eventsResponse?.data?.data || []
+    const response = await analyzeStock(symbol)
+    // await new Promise(resolve => setTimeout(resolve, 300))
+    // const eventsResponse = await getEvents(symbol)
+    const backendData = response?.data || {}
+    // const rawEvents = eventsResponse?.data || []
 
-    // Technical is non-critical — fetch separately, don't crash if it fails
+    let rawEvents = []
+
     let techData = {}
     try {
-      const techResponse = await getTechnicals(symbol)
-      techData = techResponse?.data || {}
-    } catch (techErr) {
-      console.warn("Technical fetch failed:", techErr)
-      // techData stays empty — UI shows "unavailable"
+      techData = (await getTechnicals(symbol)) || {}
+    } catch (err) {
+      console.warn("Technical fetch failed:", err)
     }
 
-    // ... rest of your eventsData building logic unchanged ...
+    let eventsData = []
+
+    rawEvents.forEach(item => {
+      if (Array.isArray(item.events)) {
+        const articleSentiment = item.sentiment || "neutral"
+        const articleScore = item.score || 0
+
+        item.events.forEach(event => {
+          eventsData.push({
+            name: event,
+            sentiment: articleSentiment,
+            score: articleScore,
+            source: item.title || null
+          })
+        })
+      }
+    })
 
     setAnalysis({
       company: symbol,
-      sentiment: backendData?.sentiment?.overall_sentiment || "HOLD",
-      news: backendData?.sentiment?.details || [],
+      sentiment: backendData?.data?.sentiment?.overall_sentiment || "HOLD",
+      news: backendData?.data?.sentiment?.details || [],
       events: eventsData,
       prediction: "HOLD",
       risk: "MEDIUM",
-      signal: backendData?.sentiment?.overall_sentiment || "HOLD",
+      signal: backendData?.data?.sentiment?.overall_sentiment || "HOLD",
       confidence: 70,
       technical: {
         rsi: techData?.RSI ?? null,
         movingAverage: techData?.SMA ?? null,
         ema: techData?.EMA ?? null,
-        rsiSignal: techData?.RSI_signal ?? null,   // 🔥 new field from backend
+        rsiSignal: techData?.RSI_signal ?? null,
       },
     })
 
     setRequestedSymbol(symbol)
+
   } catch (apiError) {
     console.error("API Error:", apiError)
-    setError(apiError?.response?.data?.message || 'Unable to fetch stock analysis. Please try again.')
+    setError(apiError?.response?.data?.message || 'Unable to fetch stock analysis.')
     setAnalysis(null)
   } finally {
     setIsLoading(false)
   }
+
+  console.log("ANALYZE:", response)
+  console.log("EVENTS:", eventsResponse)
 }
 
   const handleSearchSubmit = async (event) => {
