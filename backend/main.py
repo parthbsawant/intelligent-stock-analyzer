@@ -171,9 +171,7 @@ def analyze_stock(symbol: str = Query(...)):
             },
             "dl_prediction": prediction,
             "lstm_prediction": lstm_result,
-            "final_prediction": {
-            "signal": final_signal
-            }
+            "final_prediction": final_signal
         }
 
     except Exception as e:

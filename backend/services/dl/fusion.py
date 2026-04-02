@@ -22,7 +22,7 @@ def signal_to_score(signal):
     return 0
 
 
-def get_weighted_fusion(dl_pred, lstm_pred, sentiment_pred=None):
+def final_decision(dl_pred, lstm_pred, sentiment_pred=None):
     """
     dl_pred: {"signal": "...", "confidence": ...}
     lstm_pred: {"signal": "...", "confidence": ...}
